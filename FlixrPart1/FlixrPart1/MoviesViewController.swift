@@ -1,0 +1,105 @@
+//
+//  MoviesViewController.swift
+//  FlixrPart1
+//
+//  Created by Chato on 2/5/21.
+//
+
+import UIKit
+
+class MoviesViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+    
+    
+    @IBOutlet weak var tableView: UITableView!
+    var movies = [[String:Any]]()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        tableView.dataSource = self
+        tableView.delegate = self
+        
+        let url = URL(string: "https://api.themoviedb.org/3/movie/now_playing?api_key=a07e22bc18f5cb106bfe4cc1f83ad8ed")!
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        let session = URLSession(configuration: .default, delegate: nil, delegateQueue: OperationQueue.main)
+        let task = session.dataTask(with: request) { (data, response, error) in
+           // This will run when the network request returns
+           if let error = error {
+              print(error.localizedDescription)
+           } else if let data = data {
+              let dataDictionary = try! JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
+            
+            self.movies = dataDictionary["results"] as! [[String:Any]]
+            
+            self.tableView.reloadData()
+
+              // TODO: Get the array of movies
+              // TODO: Store the movies in a property to use elsewhere
+              // TODO: Reload your table view data
+
+           }
+        }
+        task.resume()
+
+        // Do any additional setup after loading the view.
+    }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return movies.count
+    }
+    
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "MovieCell") as! MovieCell
+        
+        let movie = movies[indexPath.row]
+        let title = movie["title"] as! String
+        let synopsis = movie["overview"] as! String
+        
+        cell.titleLabel.text = title
+        cell.synopsisLabel.text = synopsis
+        
+        let baseURL = "https://image.tmdb.org/t/p/w300"
+        let posterPath = movie["poster_path"] as! String
+        let posterURl = URL(string:baseURL + posterPath)
+        let data = try! Data(contentsOf: posterURl!)
+        
+        cell.posterView.image = UIImage(data: data)
+//        cell.posterView?.downloaded(from: posterURl!)
+        
+        return cell
+    }
+    
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        
+        let cell = sender as! UITableViewCell
+        let indexPath = tableView.indexPath(for: cell)!
+        let movie = movies[indexPath.row]
+        
+        let detailsViewController = segue.destination as! MovieDetailsViewController
+        detailsViewController.movie = movie
+        
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
+
+}
+extension UIImageView {
+    func downloaded(from url: URL, contentMode mode: UIView.ContentMode = .scaleAspectFit) {
+        contentMode = mode
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard
+                let httpURLResponse = response as? HTTPURLResponse, httpURLResponse.statusCode == 200,
+                let mimeType = response?.mimeType, mimeType.hasPrefix("image"),
+                let data = data, error == nil,
+                let image = UIImage(data: data)
+                else { return }
+            DispatchQueue.main.async() { [weak self] in
+                self?.image = image
+            }
+        }.resume()
+    }
+    func downloaded(from link: String, contentMode mode: UIView.ContentMode = .scaleAspectFit) {
+        guard let url = URL(string: link) else { return }
+        downloaded(from: url, contentMode: mode)
+    }
+}
